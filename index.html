@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLP-1 Companion & Health Tracker</title>
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d9488">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GLP-1 Tracker">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3063/3063822.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase Web SDKs (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Your glp1-app-petersen Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJypAeIuFwjZHQ6I9U8A0U3L5lv6dKkn0",
+            authDomain: "glp1-app-petersen.firebaseapp.com",
+            projectId: "glp1-app-petersen",
+            storageBucket: "glp1-app-petersen.firebasestorage.app",
+            messagingSenderId: "121229321602",
+            appId: "1:121229321602:web:e3fca25559c68112409b9b",
+            measurementId: "G-1CRN2LXXBW"
+        };
+
+        // Initialize Firebase & Firestore Database
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Expose to window object for real-time synchronization
+        window.db = db;
+        window.doc = doc;
+        window.onSnapshot = onSnapshot;
+        window.setDoc = setDoc;
+    </script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        teal: {
+                            50: '#f0fdfa', 100: '#ccfbf1', 500: '#14b8a6',
+                            600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full flex flex-col antialiased transition-colors duration-200">
+
+<div id="app" class="flex flex-col min-h-screen">
+    <!-- Header Navigation -->
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 backdrop-blur shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Brand -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-gradient-to-tr from-teal-600 to-emerald-500 rounded-2xl text-white shadow-md">
+                        <i class="fa-solid fa-syringe text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="text-lg font-bold bg-gradient-to-r from-teal-700 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
+                                GLP-1 Companion
+                            </h1>
+                            <span id="storage-indicator" class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 rounded-full flex items-center gap-1 transition-all duration-300">
+                                <i class="fa-solid fa-cloud"></i> Cloud Synced
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Pharmacokinetics & Health Tracker</p>
+                    </div>
+                </div>
+
+                <!-- User Switcher & Theme Switcher -->
+                <div class="flex items-center space-x-3">
+                    <div class="flex bg-slate-100 dark:bg-slate-700/80 p-1 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-inner">
+                        <button id="btn-user-samantha" onclick="switchUser('Samantha')" 
+                            class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block shadow-sm"></span>
+                            <span>Samantha</span>
+                        </button>
+                        <button id="btn-user-tim" onclick="switchUser('Tim')" 
+                            class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-sm"></span>
+                            <span>Tim</span>
+                        </button>
+                    </div>
+
+                    <button onclick="toggleDarkMode()" class="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Toggle Theme">
+                        <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                        <i class="fa-solid fa-sun hidden dark:block text-amber-400 text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Navigation Bar -->
+            <nav class="flex space-x-1 overflow-x-auto py-2 no-scrollbar border-t border-slate-100 dark:border-slate-700/50">
+                <button onclick="showTab('dashboard')" class="tab-btn active-tab" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-pie mr-2"></i>Dashboard
+                </button>
+                <button onclick="showTab('injections')" class="tab-btn" data-tab="injections">
+                    <i class="fa-solid fa-syringe mr-2"></i>Medication & Levels
+                </button>
+                <button onclick="showTab('progress')" class="tab-btn" data-tab="progress">
+                    <i class="fa-solid fa-ruler-combined mr-2"></i>Body Progress
+                </button>
+                <button onclick="showTab('side-effects')" class="tab-btn" data-tab="side-effects">
+                    <i class="fa-solid fa-heart-pulse mr-2"></i>Side Effects
+                </button>
+                <button onclick="showTab('nutrition')" class="tab-btn" data-tab="nutrition">
+                    <i class="fa-solid fa-utensils mr-2"></i>Daily Nutrition
+                </button>
+                <button onclick="showTab('settings')" class="tab-btn" data-tab="settings">
+                    <i class="fa-solid fa-sliders mr-2"></i>Settings & Config
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <style>
+        .tab-btn {
+            @apply px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 whitespace-nowrap transition-all flex items-center;
+        }
+        .active-tab {
+            @apply bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 font-semibold shadow-sm border border-teal-200/50 dark:border-teal-700/50;
+        }
+    </style>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="space-y-6">
+            <div id="welcome-banner" class="p-6 rounded-3xl bg-gradient-to-r from-teal-600 via-teal-700 to-emerald-700 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="relative z-10 space-y-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
+                            User Profile: <span id="dash-user-name">Samantha</span>
+                        </span>
+                        <span class="text-xs text-teal-100" id="dash-med-badge">Not configured</span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight" id="dash-greeting">Welcome!</h2>
+                    <p class="text-teal-100 text-xs sm:text-sm max-w-xl">Track active GLP-1 medication levels, body metrics, side effects, and daily nutrition targets.</p>
+                </div>
+                <div class="relative z-10 flex flex-wrap gap-2">
+                    <button onclick="openLogDoseModal()" class="px-4 py-2.5 bg-white text-teal-800 hover:bg-teal-50 font-bold text-xs sm:text-sm rounded-xl shadow-lg transition transform hover:-translate-y-0.5 flex items-center space-x-2">
+                        <i class="fa-solid fa-plus-circle text-teal-600"></i>
+                        <span>Log Dose</span>
+                    </button>
+                    <button onclick="openLogMeasurementModal()" class="px-4 py-2.5 bg-teal-800/80 hover:bg-teal-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow transition backdrop-blur-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-ruler"></i>
+                        <span>Log Measurements</span>
+                    </button>
+                </div>
+                <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300 rounded-xl text-xl">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Next Dose</p>
+                        <p class="text-base font-bold text-slate-800 dark:text-slate-100" id="dash-next-dose-date">No doses logged</p>
+                        <p class="text-[11px] text-slate-400" id="dash-dose-schedule">Schedule: Sunday</p>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 rounded-xl text-xl">
+                        <i class="fa-solid fa-wave-square"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Estimated Serum Level</p>
+                        <p class="text-base font-bold text-slate-800 dark:text-slate-100" id="dash-est-level">0.00 mg</p>
+                        <p class="text-[11px] text-emerald-500 font-semibold">Half-life Decay Model</p>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 rounded-xl text-xl">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Last Injection Site</p>
+                        <p class="text-base font-bold text-slate-800 dark:text-slate-100 truncate max-w-[130px]" id="dash-last-site">None logged</p>
+                        <p class="text-[11px] text-slate-400" id="dash-last-site-date">Ready for first dose</p>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-300 rounded-xl text-xl">
+                        <i class="fa-solid fa-ruler-horizontal" id="dash-primary-metric-icon"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="dash-primary-metric-label">Primary Metric (Waist)</p>
+                        <p class="text-base font-bold text-slate-800 dark:text-slate-100" id="dash-primary-metric-val">--</p>
+                        <p class="text-[11px] text-slate-400" id="dash-primary-metric-sub">No progress logs</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts & Nutrition -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Estimated Pharmacokinetic Curve</h3>
+                            <p class="text-xs text-slate-500">Serum drug accumulation & decay between doses</p>
+                        </div>
+                        <button onclick="showTab('injections')" class="text-xs text-teal-600 dark:text-teal-400 hover:underline font-semibold">Details &rarr;</button>
+                    </div>
+                    <div class="h-64 w-full">
+                        <canvas id="dash-decay-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Today's Goals</h3>
+                            <span class="text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300" id="dash-today-date">Today</span>
+                        </div>
+
+                        <div class="mb-3 space-y-1">
+                            <div class="flex justify-between text-xs">
+                                <span class="font-medium text-slate-700 dark:text-slate-300"><i class="fa-solid fa-drumstick-bite text-amber-500 mr-1"></i> Protein</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200" id="dash-protein-val">0 / 100 g</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                <div id="dash-protein-bar" class="bg-amber-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 space-y-1">
+                            <div class="flex justify-between text-xs">
+                                <span class="font-medium text-slate-700 dark:text-slate-300"><i class="fa-solid fa-wheat-awn text-emerald-500 mr-1"></i> Fiber</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200" id="dash-fiber-val">0 / 28 g</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                <div id="dash-fiber-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 space-y-1">
+                            <div class="flex justify-between text-xs">
+                                <span class="font-medium text-slate-700 dark:text-slate-300"><i class="fa-solid fa-glass-water text-blue-500 mr-1"></i> Water</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200" id="dash-water-val">0 / 96 oz</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                <div id="dash-water-bar" class="bg-blue-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="showTab('nutrition')" class="w-full py-2.5 bg-teal-50 dark:bg-teal-900/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 rounded-xl text-xs font-semibold transition border border-teal-200/50 dark:border-teal-800">
+                        Log Daily Intake
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Recent Side Effects Recorded</h3>
+                    <button onclick="showTab('side-effects')" class="text-xs text-teal-600 dark:text-teal-400 hover:underline font-semibold">View All Logs &rarr;</button>
+                </div>
+                <div id="dash-recent-side-effects" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+            </div>
+        </section>
+
+        <!-- TAB 2: MEDICINE & INJECTIONS -->
+        <section id="tab-injections" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Medication & Dose Tracking</h2>
+                    <p class="text-xs text-slate-500">Log injections across anatomical spots and inspect active drug levels.</p>
+                </div>
+                <button onclick="openLogDoseModal()" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Log Dose Injection</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base mb-1">Injection Site Rotation</h3>
+                        <p class="text-xs text-slate-500 mb-4">Rotate spots regularly to prevent lipohypertrophy.</p>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <button onclick="highlightSite('Abdomen Upper Left')" id="site-Abdomen-Upper-Left" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-circle-dot text-teal-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Abdomen Upper Left</span>
+                            </button>
+                            <button onclick="highlightSite('Abdomen Upper Right')" id="site-Abdomen-Upper-Right" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-circle-dot text-teal-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Abdomen Upper Right</span>
+                            </button>
+                            <button onclick="highlightSite('Abdomen Lower Left')" id="site-Abdomen-Lower-Left" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-circle-dot text-teal-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Abdomen Lower Left</span>
+                            </button>
+                            <button onclick="highlightSite('Abdomen Lower Right')" id="site-Abdomen-Lower-Right" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-circle-dot text-teal-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Abdomen Lower Right</span>
+                            </button>
+                            <button onclick="highlightSite('Thigh Left')" id="site-Thigh-Left" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-child text-indigo-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Thigh Left</span>
+                            </button>
+                            <button onclick="highlightSite('Thigh Right')" id="site-Thigh-Right" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-child text-indigo-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Thigh Right</span>
+                            </button>
+                            <button onclick="highlightSite('Upper Arm Left')" id="site-Upper-Arm-Left" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-hand text-purple-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Upper Arm Left</span>
+                            </button>
+                            <button onclick="highlightSite('Upper Arm Right')" id="site-Upper-Arm-Right" class="site-btn p-2 border border-slate-200 dark:border-slate-700 rounded-2xl text-center hover:border-teal-500 transition">
+                                <i class="fa-solid fa-hand text-purple-500 text-sm mb-1 block"></i>
+                                <span class="font-medium text-[10px]">Upper Arm Right</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
+                        <p class="text-[11px] text-slate-400">Site Rotation Info:</p>
+                        <p id="site-info-display" class="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">Click a spot above to inspect history</p>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Medication Clearance & Half-Life Curve</h3>
+                        <span class="text-xs px-2.5 py-1 bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 font-semibold rounded-full">Half-Life: ~5 Days</span>
+                    </div>
+                    <p class="text-xs text-slate-500">Serum drug accumulation modeled across past weekly doses.</p>
+                    <div class="h-72 w-full">
+                        <canvas id="full-decay-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm overflow-x-auto">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base mb-3">Injection History Logs</h3>
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-semibold uppercase text-[11px]">
+                            <th class="pb-3">Date</th>
+                            <th class="pb-3">Medicine</th>
+                            <th class="pb-3">Dosage</th>
+                            <th class="pb-3">Site Used</th>
+                            <th class="pb-3">Notes</th>
+                            <th class="pb-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="injection-history-tbody" class="divide-y divide-slate-100 dark:divide-slate-700/50"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- TAB 3: BODY PROGRESS -->
+        <section id="tab-progress" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Body Measurements & Progress</h2>
+                    <p class="text-xs text-slate-500">Track waist, hips, chest, thighs, arms, or weight based on your primary preference.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Chart Primary Metric:</label>
+                    <select id="metric-selector" onchange="changePrimaryMetric(this.value)" class="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-bold text-teal-600 dark:text-teal-400 shadow-sm">
+                        <option value="waist">Waist (inches)</option>
+                        <option value="hips">Hips (inches)</option>
+                        <option value="weight">Weight (lbs)</option>
+                        <option value="chest">Chest (inches)</option>
+                        <option value="thighs">Thighs (inches)</option>
+                        <option value="arms">Arms (inches)</option>
+                    </select>
+                    <button onclick="openLogMeasurementModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow transition flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Log Entries</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-center">
+                    <p class="text-xs text-slate-400 font-medium" id="card-label-start">Starting Value</p>
+                    <p class="text-xl font-extrabold text-slate-700 dark:text-slate-200 mt-1" id="body-start-val">--</p>
+                </div>
+                <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-center">
+                    <p class="text-xs text-slate-400 font-medium" id="card-label-curr">Current Value</p>
+                    <p class="text-xl font-extrabold text-teal-600 dark:text-teal-400 mt-1" id="body-curr-val">--</p>
+                </div>
+                <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-center">
+                    <p class="text-xs text-slate-400 font-medium" id="card-label-target">Target Goal</p>
+                    <p class="text-xl font-extrabold text-slate-700 dark:text-slate-200 mt-1" id="body-target-val">--</p>
+                </div>
+                <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-center">
+                    <p class="text-xs text-slate-400 font-medium" id="card-label-change">Total Progress</p>
+                    <p class="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1" id="body-change-val">--</p>
+                </div>
+            </div>
+
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base" id="progress-chart-title">Progress Trend</h3>
+                    <span class="text-xs font-semibold text-slate-400" id="progress-chart-sub">Configurable via Profile Settings</span>
+                </div>
+                <div class="h-72 w-full">
+                    <canvas id="body-progress-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm overflow-x-auto">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base mb-3">Measurement History Log</h3>
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-semibold uppercase text-[11px]">
+                            <th class="pb-3">Date</th>
+                            <th class="pb-3">Waist (in)</th>
+                            <th class="pb-3">Hips (in)</th>
+                            <th class="pb-3">Chest (in)</th>
+                            <th class="pb-3">Thighs (in)</th>
+                            <th class="pb-3">Arms (in)</th>
+                            <th class="pb-3">Weight (lbs)</th>
+                            <th class="pb-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body-history-tbody" class="divide-y divide-slate-100 dark:divide-slate-700/50"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- TAB 4: SIDE EFFECTS -->
+        <section id="tab-side-effects" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Side Effects Logger</h2>
+                    <p class="text-xs text-slate-500">Record symptoms with timestamps, severity ratings (1-5), and notes.</p>
+                </div>
+                <button onclick="openLogSideEffectModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Log Symptom</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <div>
+                        <h4 class="text-xs font-bold text-emerald-800 dark:text-emerald-300">Mild (Level 1 - 2)</h4>
+                        <p class="text-[11px] text-emerald-600 dark:text-emerald-400">Noticeable but manageable routine symptom.</p>
+                    </div>
+                </div>
+                <div class="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <div>
+                        <h4 class="text-xs font-bold text-amber-800 dark:text-amber-300">Moderate (Level 3)</h4>
+                        <p class="text-[11px] text-amber-600 dark:text-amber-400">Bothersome symptom requiring rest or hydration.</p>
+                    </div>
+                </div>
+                <div class="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-2xl flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                    <div>
+                        <h4 class="text-xs font-bold text-rose-800 dark:text-rose-300">Severe (Level 4 - 5)</h4>
+                        <p class="text-[11px] text-rose-600 dark:text-rose-400">Disruptive symptom; notify your prescribing doctor.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base mb-4">Symptom Log History</h3>
+                <div id="side-effects-list" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <!-- TAB 5: DAILY NUTRITION -->
+        <section id="tab-nutrition" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Daily Health & Nutrition</h2>
+                    <p class="text-xs text-slate-500">Protein and fiber help prevent muscle loss and constipation during GLP-1 therapy.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs font-semibold text-slate-500">Select Date:</span>
+                    <input type="date" id="nutrition-date-picker" onchange="loadNutritionForSelectedDate()" 
+                        class="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Protein Card -->
+                <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-3 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-2xl">
+                            <i class="fa-solid fa-drumstick-bite text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 dark:text-slate-100">Protein Target</h3>
+                            <p class="text-xs text-slate-400">Goal: <span id="nutr-protein-target-text">100</span>g / day</p>
+                        </div>
+                    </div>
+                    <div class="text-center py-2">
+                        <span class="text-4xl font-extrabold text-slate-800 dark:text-slate-100" id="nutr-protein-val">0</span>
+                        <span class="text-slate-400 text-sm font-semibold">/ <span id="nutr-protein-goal">100</span> g</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                        <div id="nutr-protein-progress" class="bg-amber-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="addNutrient('protein', 10)" class="flex-1 py-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-700 dark:text-amber-300 font-bold text-xs rounded-xl transition">+10g</button>
+                        <button onclick="addNutrient('protein', 25)" class="flex-1 py-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-700 dark:text-amber-300 font-bold text-xs rounded-xl transition">+25g</button>
+                        <button onclick="promptNutrient('protein')" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold"><i class="fa-solid fa-pen"></i></button>
+                    </div>
+                </div>
+
+                <!-- Fiber Card -->
+                <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-3 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 rounded-2xl">
+                            <i class="fa-solid fa-wheat-awn text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 dark:text-slate-100">Fiber Target</h3>
+                            <p class="text-xs text-slate-400">Goal: <span id="nutr-fiber-target-text">28</span>g / day</p>
+                        </div>
+                    </div>
+                    <div class="text-center py-2">
+                        <span class="text-4xl font-extrabold text-slate-800 dark:text-slate-100" id="nutr-fiber-val">0</span>
+                        <span class="text-slate-400 text-sm font-semibold">/ <span id="nutr-fiber-goal">28</span> g</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                        <div id="nutr-fiber-progress" class="bg-emerald-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="addNutrient('fiber', 5)" class="flex-1 py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl transition">+5g</button>
+                        <button onclick="addNutrient('fiber', 10)" class="flex-1 py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl transition">+10g</button>
+                        <button onclick="promptNutrient('fiber')" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold"><i class="fa-solid fa-pen"></i></button>
+                    </div>
+                </div>
+
+                <!-- Water Card -->
+                <div class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-3 bg-blue-100 dark:bg-blue-900/40 text-blue-600 rounded-2xl">
+                            <i class="fa-solid fa-glass-water text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 dark:text-slate-100">Water Hydration</h3>
+                            <p class="text-xs text-slate-400">Goal: <span id="nutr-water-target-text">96</span> oz / day</p>
+                        </div>
+                    </div>
+                    <div class="text-center py-2">
+                        <span class="text-4xl font-extrabold text-slate-800 dark:text-slate-100" id="nutr-water-val">0</span>
+                        <span class="text-slate-400 text-sm font-semibold">/ <span id="nutr-water-goal">96</span> oz</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                        <div id="nutr-water-progress" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="addNutrient('water', 8)" class="flex-1 py-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-blue-700 dark:text-blue-300 font-bold text-xs rounded-xl transition">+8 oz</button>
+                        <button onclick="addNutrient('water', 16)" class="flex-1 py-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-blue-700 dark:text-blue-300 font-bold text-xs rounded-xl transition">+16 oz</button>
+                        <button onclick="promptNutrient('water')" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold"><i class="fa-solid fa-pen"></i></button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: SETTINGS & CONFIG -->
+        <section id="tab-settings" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Profile Settings & Metric Config</h2>
+                <p class="text-xs text-slate-500">Configure preferences, target metrics, and dose schedules for <span id="settings-user-title" class="font-bold text-teal-600">Samantha</span>.</p>
+            </div>
+
+            <div class="p-6 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-2">
+                    Medication & Tracking Preferences
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                    <div>
+                        <label class="block font-semibold mb-1">Primary Progress Metric</label>
+                        <select id="setting-primary-metric" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 font-bold text-teal-600">
+                            <option value="waist">Waist (inches)</option>
+                            <option value="hips">Hips (inches)</option>
+                            <option value="weight">Weight (lbs)</option>
+                            <option value="chest">Chest (inches)</option>
+                            <option value="thighs">Thighs (inches)</option>
+                            <option value="arms">Arms (inches)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Target Primary Goal Value</label>
+                        <input type="number" step="0.1" id="setting-target-val" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900" placeholder="e.g., 28.0 in or 160 lbs">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Medication Name</label>
+                        <select id="setting-med-name" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                            <option value="Zepbound (Tirzepatide)">Zepbound (Tirzepatide)</option>
+                            <option value="Wegovy (Semaglutide)">Wegovy (Semaglutide)</option>
+                            <option value="Mounjaro (Tirzepatide)">Mounjaro (Tirzepatide)</option>
+                            <option value="Ozempic (Semaglutide)">Ozempic (Semaglutide)</option>
+                            <option value="Saxenda (Liraglutide)">Saxenda (Liraglutide)</option>
+                            <option value="Trulicity (Dulaglutide)">Trulicity (Dulaglutide)</option>
+                            <option value="Custom GLP-1">Custom GLP-1</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Current Scheduled Dose (mg)</label>
+                        <input type="number" step="0.25" id="setting-med-dose" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900" placeholder="e.g., 2.5 or 5.0">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Scheduled Dosage Day</label>
+                        <select id="setting-dose-day" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                            <option value="Sunday">Every Sunday</option>
+                            <option value="Monday">Every Monday</option>
+                            <option value="Tuesday">Every Tuesday</option>
+                            <option value="Wednesday">Every Wednesday</option>
+                            <option value="Thursday">Every Thursday</option>
+                            <option value="Friday">Every Friday</option>
+                            <option value="Saturday">Every Saturday</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Daily Protein Target (g)</label>
+                        <input type="number" id="setting-goal-protein" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Daily Fiber Target (g)</label>
+                        <input type="number" id="setting-goal-fiber" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Daily Water Target (oz)</label>
+                        <input type="number" id="setting-goal-water" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="saveSettings()" class="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition shadow">
+                        Save Preferences
+                    </button>
+                </div>
+            </div>
+
+            <!-- Backup & Clear Data -->
+            <div class="p-6 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-2">
+                    Data Persistence & Backup
+                </h3>
+                <p class="text-xs text-slate-500">Updates sync in real-time across devices using Firebase Firestore.</p>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="exportUserData()" class="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Export Backup JSON</span>
+                    </button>
+                    <label class="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center space-x-2">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Import Backup JSON</span>
+                        <input type="file" id="import-json-file" accept=".json" onchange="importUserData(event)" class="hidden">
+                    </label>
+                    <button onclick="openClearConfirmModal()" class="px-4 py-2.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Clear All Logs</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<!-- MODAL 1: LOG INJECTION -->
+<div id="modal-log-dose" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
+        <div class="flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100">Log Injection Dose</h3>
+            <button onclick="closeModal('modal-log-dose')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form onsubmit="submitDoseForm(event)" class="space-y-3 text-xs sm:text-sm">
+            <div>
+                <label class="block font-semibold mb-1">Date & Time</label>
+                <input type="datetime-local" id="form-dose-date" required class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Medication Name</label>
+                <input type="text" id="form-dose-med" required placeholder="e.g., Zepbound" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Dosage Amount (mg)</label>
+                <input type="number" step="0.25" id="form-dose-mg" required placeholder="e.g. 2.5 or 5.0" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Injection Site</label>
+                <select id="form-dose-site" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    <option value="Abdomen Lower Left">Abdomen Lower Left</option>
+                    <option value="Abdomen Lower Right">Abdomen Lower Right</option>
+                    <option value="Abdomen Upper Left">Abdomen Upper Left</option>
+                    <option value="Abdomen Upper Right">Abdomen Upper Right</option>
+                    <option value="Thigh Left">Thigh Left</option>
+                    <option value="Thigh Right">Thigh Right</option>
+                    <option value="Upper Arm Left">Upper Arm Left</option>
+                    <option value="Upper Arm Right">Upper Arm Right</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Notes</label>
+                <input type="text" id="form-dose-notes" placeholder="Optional notes" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div class="pt-2 flex justify-end space-x-2">
+                <button type="button" onclick="closeModal('modal-log-dose')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl">Save Injection</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 2: LOG BODY MEASUREMENTS -->
+<div id="modal-log-measurement" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100">Log Body Measurements</h3>
+            <button onclick="closeModal('modal-log-measurement')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form onsubmit="submitMeasurementForm(event)" class="space-y-3 text-xs sm:text-sm">
+            <div>
+                <label class="block font-semibold mb-1">Date</label>
+                <input type="date" id="form-body-date" required class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-semibold mb-1">Waist (in)</label>
+                    <input type="number" step="0.1" id="form-body-waist" placeholder="e.g. 30.0" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Hips (in)</label>
+                    <input type="number" step="0.1" id="form-body-hips" placeholder="e.g. 38.0" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block font-semibold mb-1">Chest (in)</label>
+                    <input type="number" step="0.1" id="form-body-chest" placeholder="e.g. 36.0" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Thighs (in)</label>
+                    <input type="number" step="0.1" id="form-body-thighs" placeholder="e.g. 22.0" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Arms (in)</label>
+                    <input type="number" step="0.1" id="form-body-arms" placeholder="e.g. 11.5" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                </div>
+            </div>
+            <div>
+                <label class="block font-semibold mb-1 text-slate-500 dark:text-slate-400">Weight (lbs) <span class="text-[10px] text-slate-400 font-normal">(Optional)</span></label>
+                <input type="number" step="0.1" id="form-body-weight" placeholder="Optional" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div class="pt-2 flex justify-end space-x-2">
+                <button type="button" onclick="closeModal('modal-log-measurement')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl">Save Measurements</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 3: LOG SIDE EFFECT -->
+<div id="modal-log-side-effect" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
+        <div class="flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100">Log Side Effect</h3>
+            <button onclick="closeModal('modal-log-side-effect')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form onsubmit="submitSideEffectForm(event)" class="space-y-3 text-xs sm:text-sm">
+            <div>
+                <label class="block font-semibold mb-1">Date & Time</label>
+                <input type="datetime-local" id="form-se-date" required class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Symptom Type</label>
+                <select id="form-se-type" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    <option value="Nausea">Nausea</option>
+                    <option value="Fatigue">Fatigue</option>
+                    <option value="Constipation">Constipation</option>
+                    <option value="Acid Reflux / Heartburn">Acid Reflux / Heartburn</option>
+                    <option value="Headache">Headache</option>
+                    <option value="Diarrhea">Diarrhea</option>
+                    <option value="Injection Site Redness">Injection Site Redness</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Severity Rating (1 to 5)</label>
+                <select id="form-se-severity" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900">
+                    <option value="1">1 - Very Mild</option>
+                    <option value="2">2 - Mild</option>
+                    <option value="3" selected>3 - Moderate</option>
+                    <option value="4">4 - Severe</option>
+                    <option value="5">5 - Very Severe</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-1">Notes</label>
+                <textarea id="form-se-notes" rows="2" placeholder="Describe symptoms or potential triggers..." class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900"></textarea>
+            </div>
+            <div class="pt-2 flex justify-end space-x-2">
+                <button type="button" onclick="closeModal('modal-log-side-effect')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl">Save Symptom</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 4: CONFIRM CLEAR DATA -->
+<div id="modal-clear-confirm" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700 text-center">
+        <div class="p-3 bg-rose-100 text-rose-600 rounded-full w-12 h-12 mx-auto flex items-center justify-center text-xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100">Clear All Logs?</h3>
+            <p class="text-xs text-slate-500 mt-1">This will erase all injections, progress logs, side effects, and nutrition data for <span id="clear-modal-username" class="font-bold">Samantha</span>.</p>
+        </div>
+        <div class="flex justify-center space-x-2 pt-2">
+            <button onclick="closeModal('modal-clear-confirm')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl text-xs">Cancel</button>
+            <button onclick="confirmClearData()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-xs">Clear Everything</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentUser = 'Samantha';
+    let dashDecayChart = null;
+    let fullDecayChart = null;
+    let bodyChart = null;
+    let unsubscribeUserSync = null;
+
+    const emptyProfileData = {
+        Samantha: {
+            medication: 'Zepbound (Tirzepatide)',
+            defaultDose: 2.5,
+            scheduledDay: 'Sunday',
+            primaryMetric: 'waist',
+            targetMetricVal: null,
+            goalProtein: 100,
+            goalFiber: 28,
+            goalWater: 96,
+            injections: [],
+            sideEffects: [],
+            bodyLogs: [],
+            nutritionLogs: {}
+        },
+        Tim: {
+            medication: 'Wegovy (Semaglutide)',
+            defaultDose: 0.25,
+            scheduledDay: 'Saturday',
+            primaryMetric: 'weight',
+            targetMetricVal: null,
+            goalProtein: 120,
+            goalFiber: 30,
+            goalWater: 100,
+            injections: [],
+            sideEffects: [],
+            bodyLogs: [],
+            nutritionLogs: {}
+        }
+    };
+
+    let userCache = {
+        Samantha: JSON.parse(JSON.stringify(emptyProfileData.Samantha)),
+        Tim: JSON.parse(JSON.stringify(emptyProfileData.Tim))
+    };
+
+    function listenToUserFirestore(user) {
+        if (unsubscribeUserSync) unsubscribeUserSync();
+
+        if (window.db && window.doc && window.onSnapshot) {
+            const userDocRef = window.doc(window.db, "glp1_users", user);
+            unsubscribeUserSync = window.onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    userCache[user] = docSnap.data();
+                } else {
+                    saveUserData(user, emptyProfileData[user]);
+                }
+                refreshUI();
+            }, (error) => {
+                console.error("Firestore Listen Error:", error);
+                loadFromLocalStorage(user);
+                refreshUI();
+            });
+        } else {
+            loadFromLocalStorage(user);
+            refreshUI();
+        }
+    }
+
+    function loadFromLocalStorage(user) {
+        const stored = localStorage.getItem(`glp1_clean_v1_${user}`);
+        if (stored) {
+            try { userCache[user] = JSON.parse(stored); } catch (e) { console.error(e); }
+        }
+    }
+
+    async function saveUserData(user, data) {
+        userCache[user] = data;
+        localStorage.setItem(`glp1_clean_v1_${user}`, JSON.stringify(data));
+
+        if (window.db && window.doc && window.setDoc) {
+            try {
+                const userDocRef = window.doc(window.db, "glp1_users", user);
+                await window.setDoc(userDocRef, data);
+            } catch (err) {
+                console.error("Firestore Save Error:", err);
+            }
+        }
+
+        const ind = document.getElementById('storage-indicator');
+        if (ind) {
+            ind.classList.add('bg-emerald-200', 'text-emerald-900');
+            setTimeout(() => ind.classList.remove('bg-emerald-200', 'text-emerald-900'), 400);
+        }
+    }
+
+    function getCurrentData() {
+        return userCache[currentUser] || emptyProfileData[currentUser];
+    }
+
+    function updateCurrentData(data) {
+        saveUserData(currentUser, data);
+        refreshUI();
+    }
+
+    // Half-Life Pharmacokinetic Estimation Model (~5 Day Half-Life)
+    function calculateMedicationLevel(injections, targetDateStr) {
+        if (!injections || injections.length === 0) return 0;
+
+        const targetTime = new Date(targetDateStr).getTime();
+        const halfLifeHours = 5 * 24;
+        let totalResidualMg = 0;
+
+        injections.forEach(inj => {
+            const injTime = new Date(inj.date).getTime();
+            const elapsedHours = (targetTime - injTime) / (1000 * 3600);
+            
+            if (elapsedHours >= 0) {
+                let level = 0;
+                if (elapsedHours < 24) {
+                    level = inj.dose * (elapsedHours / 24);
+                } else {
+                    const postPeakHours = elapsedHours - 24;
+                    level = inj.dose * Math.pow(0.5, postPeakHours / halfLifeHours);
+                }
+                totalResidualMg += level;
+            }
+        });
+
+        return parseFloat(totalResidualMg.toFixed(2));
+    }
+
+    function switchUser(user) {
+        currentUser = user;
+        
+        const samBtn = document.getElementById('btn-user-samantha');
+        const timBtn = document.getElementById('btn-user-tim');
+
+        if (user === 'Samantha') {
+            samBtn.className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 bg-pink-500 text-white shadow-md";
+            timBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600";
+        } else {
+            timBtn.className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 bg-blue-500 text-white shadow-md";
+            samBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600";
+        }
+
+        listenToUserFirestore(user);
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabId) {
+                btn.classList.add('active-tab');
+            } else {
+                btn.classList.remove('active-tab');
+            }
+        });
+
+        setTimeout(() => {
+            if (dashDecayChart) dashDecayChart.resize();
+            if (fullDecayChart) fullDecayChart.resize();
+            if (bodyChart) bodyChart.resize();
+        }, 50);
+    }
+
+    function refreshUI() {
+        const data = getCurrentData();
+
+        document.getElementById('dash-user-name').innerText = currentUser;
+        document.getElementById('settings-user-title').innerText = currentUser;
+        document.getElementById('dash-greeting').innerText = `Welcome, ${currentUser}!`;
+        document.getElementById('dash-med-badge').innerText = data.medication ? `${data.medication} ${data.defaultDose || ''}mg` : 'Not configured';
+
+        const sortedInj = [...(data.injections || [])].sort((a,b) => new Date(b.date) - new Date(a.date));
+        const lastInj = sortedInj[0];
+
+        if (lastInj) {
+            const lastDate = new Date(lastInj.date);
+            const nextDate = new Date(lastDate);
+            nextDate.setDate(nextDate.getDate() + 7);
+
+            const now = new Date();
+            const daysUntil = Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24));
+            
+            document.getElementById('dash-next-dose-date').innerText = daysUntil > 0 ? `In ${daysUntil} Day(s)` : (daysUntil === 0 ? 'Due Today!' : 'Overdue');
+            document.getElementById('dash-dose-schedule').innerText = `Scheduled: Every ${data.scheduledDay || 'Sunday'}`;
+            document.getElementById('dash-last-site').innerText = lastInj.site;
+            
+            const diffDays = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+            document.getElementById('dash-last-site-date').innerText = `${diffDays} days ago (${lastDate.toLocaleDateString()})`;
+        } else {
+            document.getElementById('dash-next-dose-date').innerText = 'No doses logged';
+            document.getElementById('dash-dose-schedule').innerText = `Schedule: Every ${data.scheduledDay || 'Sunday'}`;
+            document.getElementById('dash-last-site').innerText = 'None logged';
+            document.getElementById('dash-last-site-date').innerText = 'Ready for first dose';
+        }
+
+        const currentEst = calculateMedicationLevel(data.injections || [], new Date().toISOString());
+        document.getElementById('dash-est-level').innerText = `${currentEst} mg`;
+
+        const primaryMetric = data.primaryMetric || 'waist';
+        const unit = primaryMetric === 'weight' ? 'lbs' : 'in';
+        const metricNameUpper = primaryMetric.charAt(0).toUpperCase() + primaryMetric.slice(1);
+
+        document.getElementById('metric-selector').value = primaryMetric;
+
+        const sortedBody = [...(data.bodyLogs || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const validMetricLogs = sortedBody.filter(b => b[primaryMetric] !== null && b[primaryMetric] !== undefined && !isNaN(b[primaryMetric]));
+
+        document.getElementById('dash-primary-metric-label').innerText = `Primary Metric (${metricNameUpper})`;
+
+        if (validMetricLogs.length > 0) {
+            const latestVal = validMetricLogs[validMetricLogs.length - 1][primaryMetric];
+            const startVal = validMetricLogs[0][primaryMetric];
+            const change = (latestVal - startVal).toFixed(1);
+
+            document.getElementById('dash-primary-metric-val').innerText = `${change <= 0 ? '' : '+'}${change} ${unit}`;
+            document.getElementById('dash-primary-metric-sub').innerText = `Current: ${latestVal} ${unit}`;
+
+            document.getElementById('card-label-start').innerText = `Starting ${metricNameUpper}`;
+            document.getElementById('body-start-val').innerText = `${startVal} ${unit}`;
+
+            document.getElementById('card-label-curr').innerText = `Current ${metricNameUpper}`;
+            document.getElementById('body-curr-val').innerText = `${latestVal} ${unit}`;
+
+            document.getElementById('card-label-target').innerText = `Target Goal`;
+            document.getElementById('body-target-val').innerText = data.targetMetricVal ? `${data.targetMetricVal} ${unit}` : 'Not set';
+
+            document.getElementById('card-label-change').innerText = `Total Progress`;
+            document.getElementById('body-change-val').innerText = `${change <= 0 ? '' : '+'}${change} ${unit}`;
+        } else {
+            document.getElementById('dash-primary-metric-val').innerText = `--`;
+            document.getElementById('dash-primary-metric-sub').innerText = `No ${primaryMetric} logged`;
+
+            document.getElementById('card-label-start').innerText = `Starting ${metricNameUpper}`;
+            document.getElementById('body-start-val').innerText = `--`;
+
+            document.getElementById('card-label-curr').innerText = `Current ${metricNameUpper}`;
+            document.getElementById('body-curr-val').innerText = `--`;
+
+            document.getElementById('card-label-target').innerText = `Target Goal`;
+            document.getElementById('body-target-val').innerText = data.targetMetricVal ? `${data.targetMetricVal} ${unit}` : 'Not set';
+
+            document.getElementById('card-label-change').innerText = `Total Progress`;
+            document.getElementById('body-change-val').innerText = `--`;
+        }
+
+        renderNutritionSection(data);
+        renderSideEffectsList(data.sideEffects || []);
+        renderInjectionTable(data.injections || []);
+        highlightSite(lastInj ? lastInj.site : null);
+        renderBodyTable(data.bodyLogs || []);
+
+        document.getElementById('setting-primary-metric').value = primaryMetric;
+        document.getElementById('setting-target-val').value = data.targetMetricVal || '';
+        document.getElementById('setting-med-name').value = data.medication || 'Zepbound (Tirzepatide)';
+        document.getElementById('setting-med-dose').value = data.defaultDose || '';
+        document.getElementById('setting-dose-day').value = data.scheduledDay || 'Sunday';
+        document.getElementById('setting-goal-protein').value = data.goalProtein || 100;
+        document.getElementById('setting-goal-fiber').value = data.goalFiber || 28;
+        document.getElementById('setting-goal-water').value = data.goalWater || 96;
+
+        renderDecayCharts(data);
+        renderBodyProgressChart(data, primaryMetric);
+    }
+
+    function changePrimaryMetric(metricKey) {
+        const data = getCurrentData();
+        data.primaryMetric = metricKey;
+        updateCurrentData(data);
+    }
+
+    function getTodayKey() {
+        const datePicker = document.getElementById('nutrition-date-picker');
+        if (datePicker && datePicker.value) return datePicker.value;
+        return new Date().toISOString().split('T')[0];
+    }
+
+    function renderNutritionSection(data) {
+        const todayKey = getTodayKey();
+        const datePicker = document.getElementById('nutrition-date-picker');
+        if (datePicker && !datePicker.value) datePicker.value = todayKey;
+
+        const dayLog = (data.nutritionLogs && data.nutritionLogs[todayKey]) ? data.nutritionLogs[todayKey] : { protein: 0, fiber: 0, water: 0 };
+
+        const gProtein = data.goalProtein || 100;
+        const gFiber = data.goalFiber || 28;
+        const gWater = data.goalWater || 96;
+
+        const isToday = todayKey === new Date().toISOString().split('T')[0];
+        document.getElementById('dash-today-date').innerText = isToday ? 'Today' : todayKey;
+
+        document.getElementById('dash-protein-val').innerText = `${dayLog.protein} / ${gProtein} g`;
+        document.getElementById('dash-protein-bar').style.width = `${Math.min(100, (dayLog.protein / gProtein) * 100)}%`;
+
+        document.getElementById('dash-fiber-val').innerText = `${dayLog.fiber} / ${gFiber} g`;
+        document.getElementById('dash-fiber-bar').style.width = `${Math.min(100, (dayLog.fiber / gFiber) * 100)}%`;
+
+        document.getElementById('dash-water-val').innerText = `${dayLog.water} / ${gWater} oz`;
+        document.getElementById('dash-water-bar').style.width = `${Math.min(100, (dayLog.water / gWater) * 100)}%`;
+
+        document.getElementById('nutr-protein-val').innerText = dayLog.protein;
+        document.getElementById('nutr-protein-goal').innerText = gProtein;
+        document.getElementById('nutr-protein-target-text').innerText = gProtein;
+        document.getElementById('nutr-protein-progress').style.width = `${Math.min(100, (dayLog.protein / gProtein) * 100)}%`;
+
+        document.getElementById('nutr-fiber-val').innerText = dayLog.fiber;
+        document.getElementById('nutr-fiber-goal').innerText = gFiber;
+        document.getElementById('nutr-fiber-target-text').innerText = gFiber;
+        document.getElementById('nutr-fiber-progress').style.width = `${Math.min(100, (dayLog.fiber / gFiber) * 100)}%`;
+
+        document.getElementById('nutr-water-val').innerText = dayLog.water;
+        document.getElementById('nutr-water-goal').innerText = gWater;
+        document.getElementById('nutr-water-target-text').innerText = gWater;
+        document.getElementById('nutr-water-progress').style.width = `${Math.min(100, (dayLog.water / gWater) * 100)}%`;
+    }
+
+    function addNutrient(type, amount) {
+        const data = getCurrentData();
+        const key = getTodayKey();
+        if (!data.nutritionLogs) data.nutritionLogs = {};
+        if (!data.nutritionLogs[key]) data.nutritionLogs[key] = { protein: 0, fiber: 0, water: 0 };
+
+        data.nutritionLogs[key][type] = (data.nutritionLogs[key][type] || 0) + amount;
+        updateCurrentData(data);
+    }
+
+    function promptNutrient(type) {
+        const data = getCurrentData();
+        const key = getTodayKey();
+        const curr = (data.nutritionLogs && data.nutritionLogs[key]) ? (data.nutritionLogs[key][type] || 0) : 0;
+        const val = prompt(`Set total ${type} intake for ${key}:`, curr);
+        if (val !== null && !isNaN(val)) {
+            if (!data.nutritionLogs) data.nutritionLogs = {};
+            if (!data.nutritionLogs[key]) data.nutritionLogs[key] = { protein: 0, fiber: 0, water: 0 };
+            data.nutritionLogs[key][type] = Math.max(0, parseFloat(val));
+            updateCurrentData(data);
+        }
+    }
+
+    function loadNutritionForSelectedDate() {
+        renderNutritionSection(getCurrentData());
+    }
+
+    function renderSideEffectsList(effects) {
+        const recentContainer = document.getElementById('dash-recent-side-effects');
+        const listContainer = document.getElementById('side-effects-list');
+
+        recentContainer.innerHTML = '';
+        listContainer.innerHTML = '';
+
+        if (!effects || effects.length === 0) {
+            recentContainer.innerHTML = `
+                <div class="col-span-3 p-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center">
+                    <p class="text-xs text-slate-400 italic">No side effects recorded yet.</p>
+                </div>`;
+            listContainer.innerHTML = `
+                <div class="p-8 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center space-y-2">
+                    <i class="fa-solid fa-notes-medical text-2xl text-slate-300 dark:text-slate-600"></i>
+                    <p class="text-xs text-slate-400 italic">No side effects logged yet.</p>
+                    <button onclick="openLogSideEffectModal()" class="px-3 py-1.5 bg-amber-600 text-white font-semibold rounded-xl text-xs inline-block">Log First Symptom</button>
+                </div>`;
+            return;
+        }
+
+        const sorted = [...effects].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        sorted.slice(0, 3).forEach(se => {
+            const sevColor = se.severity >= 4 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' :
+                            (se.severity == 3 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' :
+                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300');
+
+            recentContainer.innerHTML += `
+                <div class="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-xs text-slate-800 dark:text-slate-100">${se.type}</span>
+                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${sevColor}">Level ${se.severity}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">${new Date(se.date).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
+                    ${se.notes ? `<p class="text-xs text-slate-600 dark:text-slate-300 truncate">${se.notes}</p>` : ''}
+                </div>
+            `;
+        });
+
+        sorted.forEach(se => {
+            const sevBadge = se.severity >= 4 ? 'bg-rose-500 text-white' :
+                            (se.severity == 3 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white');
+
+            listContainer.innerHTML += `
+                <div class="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${se.type}</span>
+                            <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold ${sevBadge}">Severity: Level ${se.severity}</span>
+                        </div>
+                        <p class="text-xs text-slate-400"><i class="fa-regular fa-clock mr-1"></i>${new Date(se.date).toLocaleString()}</p>
+                        ${se.notes ? `<p class="text-xs text-slate-600 dark:text-slate-300 mt-1">${se.notes}</p>` : ''}
+                    </div>
+                    <button onclick="deleteSideEffect('${se.id}')" class="text-xs text-rose-500 hover:text-rose-700 self-end sm:self-center">
+                        <i class="fa-solid fa-trash-can mr-1"></i>Delete
+                    </button>
+                </div>
+            `;
+        });
+    }
+
+    function deleteSideEffect(id) {
+        const data = getCurrentData();
+        data.sideEffects = (data.sideEffects || []).filter(s => s.id !== id);
+        updateCurrentData(data);
+    }
+
+    function renderInjectionTable(injections) {
+        const tbody = document.getElementById('injection-history-tbody');
+        tbody.innerHTML = '';
+
+        if (!injections || injections.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="py-8 text-center text-slate-400">
+                        <div class="space-y-2">
+                            <p class="italic text-xs">No doses logged yet.</p>
+                            <button onclick="openLogDoseModal()" class="px-3 py-1.5 bg-teal-600 text-white font-semibold rounded-xl text-xs">Log Your First Dose</button>
+                        </div>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const sorted = [...injections].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        sorted.forEach(inj => {
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                    <td class="py-3 font-medium">${new Date(inj.date).toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})}</td>
+                    <td class="py-3">${inj.med}</td>
+                    <td class="py-3 font-bold text-teal-600 dark:text-teal-400">${inj.dose} mg</td>
+                    <td class="py-3"><span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg font-medium text-xs">${inj.site}</span></td>
+                    <td class="py-3 text-slate-500">${inj.notes || '-'}</td>
+                    <td class="py-3 text-right">
+                        <button onclick="deleteInjection('${inj.id}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function deleteInjection(id) {
+        const data = getCurrentData();
+        data.injections = (data.injections || []).filter(i => i.id !== id);
+        updateCurrentData(data);
+    }
+
+    function highlightSite(siteName) {
+        document.querySelectorAll('.site-btn').forEach(btn => {
+            btn.classList.remove('border-teal-500', 'bg-teal-50', 'dark:bg-teal-900/40', 'ring-2', 'ring-teal-400');
+        });
+
+        const display = document.getElementById('site-info-display');
+
+        if (!siteName) {
+            display.innerText = 'No injections recorded yet. Pick any spot for your first dose.';
+            return;
+        }
+
+        const targetId = `site-${siteName.replace(/\s+/g, '-')}`;
+        const targetBtn = document.getElementById(targetId);
+        
+        if (targetBtn) {
+            targetBtn.classList.add('border-teal-500', 'bg-teal-50', 'dark:bg-teal-900/40', 'ring-2', 'ring-teal-400');
+        }
+
+        const data = getCurrentData();
+        const siteLogs = (data.injections || []).filter(i => i.site === siteName).sort((a,b) => new Date(b.date) - new Date(a.date));
+        
+        if (siteLogs.length > 0) {
+            const lastUsed = new Date(siteLogs[0].date).toLocaleDateString();
+            display.innerText = `${siteName} (Last used: ${lastUsed})`;
+        } else {
+            display.innerText = `${siteName} (Never used - Recommended next spot)`;
+        }
+    }
+
+    function renderBodyTable(logs) {
+        const tbody = document.getElementById('body-history-tbody');
+        tbody.innerHTML = '';
+
+        if (!logs || logs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="py-8 text-center text-slate-400">
+                        <div class="space-y-2">
+                            <p class="italic text-xs">No progress logs added yet.</p>
+                            <button onclick="openLogMeasurementModal()" class="px-3 py-1.5 bg-indigo-600 text-white font-semibold rounded-xl text-xs">Add First Entry</button>
+                        </div>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const sorted = [...logs].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        sorted.forEach(b => {
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                    <td class="py-3 font-medium">${b.date}</td>
+                    <td class="py-3 font-bold text-teal-600 dark:text-teal-400">${b.waist ? b.waist + '"' : '-'}</td>
+                    <td class="py-3">${b.hips ? b.hips + '"' : '-'}</td>
+                    <td class="py-3">${b.chest ? b.chest + '"' : '-'}</td>
+                    <td class="py-3">${b.thighs ? b.thighs + '"' : '-'}</td>
+                    <td class="py-3">${b.arms ? b.arms + '"' : '-'}</td>
+                    <td class="py-3 text-slate-500">${b.weight ? b.weight + ' lbs' : '<span class="text-slate-300 italic">--</span>'}</td>
+                    <td class="py-3 text-right">
+                        <button onclick="deleteBodyLog('${b.id}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function deleteBodyLog(id) {
+        const data = getCurrentData();
+        data.bodyLogs = (data.bodyLogs || []).filter(b => b.id !== id);
+        updateCurrentData(data);
+    }
+
+    function renderDecayCharts(data) {
+        const labels = [];
+        const levels = [];
+        const now = new Date();
+
+        for (let i = -14; i <= 7; i++) {
+            const d = new Date(now);
+            d.setDate(d.getDate() + i);
+            labels.push(d.toLocaleDateString([], { month: 'short', day: 'numeric' }));
+            levels.push(calculateMedicationLevel(data.injections || [], d.toISOString()));
+        }
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? '#334155' : '#e2e8f0';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+
+        const chartConfig = {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Active Medication Serum Level (mg)',
+                    data: levels,
+                    borderColor: '#0d9488',
+                    backgroundColor: 'rgba(13, 148, 136, 0.15)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+                    y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
+                }
+            }
+        };
+
+        const dashCtx = document.getElementById('dash-decay-chart').getContext('2d');
+        if (dashDecayChart) dashDecayChart.destroy();
+        dashDecayChart = new Chart(dashCtx, chartConfig);
+
+        const fullCtx = document.getElementById('full-decay-chart').getContext('2d');
+        if (fullDecayChart) fullDecayChart.destroy();
+        fullDecayChart = new Chart(fullCtx, chartConfig);
+    }
+
+    function renderBodyProgressChart(data, metricKey) {
+        const sorted = [...(data.bodyLogs || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const filtered = sorted.filter(b => b[metricKey] !== null && b[metricKey] !== undefined && !isNaN(b[metricKey]));
+
+        const labels = filtered.map(b => b.date);
+        const values = filtered.map(b => b[metricKey]);
+
+        const metricTitle = metricKey.charAt(0).toUpperCase() + metricKey.slice(1);
+        const unit = metricKey === 'weight' ? 'lbs' : 'inches';
+
+        document.getElementById('progress-chart-title').innerText = `${metricTitle} Progress Trend (${unit})`;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? '#334155' : '#e2e8f0';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+
+        const bodyCtx = document.getElementById('body-progress-chart').getContext('2d');
+        if (bodyChart) bodyChart.destroy();
+
+        bodyChart = new Chart(bodyCtx, {
+            type: 'line',
+            data: {
+                labels: labels.length > 0 ? labels : ['No Data'],
+                datasets: [{
+                    label: `${metricTitle} (${unit})`,
+                    data: values.length > 0 ? values : [0],
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#6366f1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+                    y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    // Modal Control Functions
+    function openLogDoseModal() {
+        const data = getCurrentData();
+        document.getElementById('form-dose-date').value = new Date().toISOString().slice(0,16);
+        document.getElementById('form-dose-med').value = data.medication || '';
+        document.getElementById('form-dose-mg').value = data.defaultDose || '';
+        document.getElementById('modal-log-dose').classList.remove('hidden');
+    }
+
+    function openLogSideEffectModal() {
+        document.getElementById('form-se-date').value = new Date().toISOString().slice(0,16);
+        document.getElementById('modal-log-side-effect').classList.remove('hidden');
+    }
+
+    function openLogMeasurementModal() {
+        document.getElementById('form-body-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('modal-log-measurement').classList.remove('hidden');
+    }
+
+    function openClearConfirmModal() {
+        document.getElementById('clear-modal-username').innerText = currentUser;
+        document.getElementById('modal-clear-confirm').classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+
+    function submitDoseForm(e) {
+        e.preventDefault();
+        const data = getCurrentData();
+        if (!data.injections) data.injections = [];
+        const newInj = {
+            id: 'inj_' + Date.now(),
+            date: document.getElementById('form-dose-date').value,
+            med: document.getElementById('form-dose-med').value,
+            dose: parseFloat(document.getElementById('form-dose-mg').value),
+            site: document.getElementById('form-dose-site').value,
+            notes: document.getElementById('form-dose-notes').value
+        };
+        data.injections.push(newInj);
+        updateCurrentData(data);
+        closeModal('modal-log-dose');
+    }
+
+    function submitSideEffectForm(e) {
+        e.preventDefault();
+        const data = getCurrentData();
+        if (!data.sideEffects) data.sideEffects = [];
+        const newSe = {
+            id: 'se_' + Date.now(),
+            date: document.getElementById('form-se-date').value,
+            type: document.getElementById('form-se-type').value,
+            severity: parseInt(document.getElementById('form-se-severity').value),
+            notes: document.getElementById('form-se-notes').value
+        };
+        data.sideEffects.push(newSe);
+        updateCurrentData(data);
+        closeModal('modal-log-side-effect');
+    }
+
+    function submitMeasurementForm(e) {
+        e.preventDefault();
+        const data = getCurrentData();
+        if (!data.bodyLogs) data.bodyLogs = [];
+        const wtVal = document.getElementById('form-body-weight').value;
+        const waistVal = document.getElementById('form-body-waist').value;
+        const hipsVal = document.getElementById('form-body-hips').value;
+        const chestVal = document.getElementById('form-body-chest').value;
+        const thighsVal = document.getElementById('form-body-thighs').value;
+        const armsVal = document.getElementById('form-body-arms').value;
+
+        const newBody = {
+            id: 'body_' + Date.now(),
+            date: document.getElementById('form-body-date').value,
+            waist: waistVal ? parseFloat(waistVal) : null,
+            hips: hipsVal ? parseFloat(hipsVal) : null,
+            chest: chestVal ? parseFloat(chestVal) : null,
+            thighs: thighsVal ? parseFloat(thighsVal) : null,
+            arms: armsVal ? parseFloat(armsVal) : null,
+            weight: wtVal ? parseFloat(wtVal) : null
+        };
+        data.bodyLogs.push(newBody);
+        updateCurrentData(data);
+        closeModal('modal-log-measurement');
+    }
+
+    function saveSettings() {
+        const data = getCurrentData();
+        data.primaryMetric = document.getElementById('setting-primary-metric').value;
+        data.targetMetricVal = parseFloat(document.getElementById('setting-target-val').value) || null;
+        data.medication = document.getElementById('setting-med-name').value;
+        data.defaultDose = parseFloat(document.getElementById('setting-med-dose').value) || null;
+        data.scheduledDay = document.getElementById('setting-dose-day').value;
+        data.goalProtein = parseFloat(document.getElementById('setting-goal-protein').value) || 100;
+        data.goalFiber = parseFloat(document.getElementById('setting-goal-fiber').value) || 28;
+        data.goalWater = parseFloat(document.getElementById('setting-goal-water').value) || 96;
+        updateCurrentData(data);
+    }
+
+    function confirmClearData() {
+        const fresh = JSON.parse(JSON.stringify(emptyProfileData[currentUser]));
+        saveUserData(currentUser, fresh);
+        closeModal('modal-clear-confirm');
+        refreshUI();
+    }
+
+    function exportUserData() {
+        const data = getCurrentData();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `GLP1_Data_${currentUser}_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importUserData(e) {
+        const fileReader = new FileReader();
+        fileReader.onload = function (event) {
+            try {
+                const importedData = JSON.parse(event.target.result);
+                saveUserData(currentUser, importedData);
+                refreshUI();
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        if (e.target.files[0]) {
+            fileReader.readAsText(e.target.files[0]);
+        }
+    }
+
+    function toggleDarkMode() {
+        document.documentElement.classList.toggle('dark');
+        refreshUI();
+    }
+
+    window.onload = function() {
+        setTimeout(() => switchUser('Samantha'), 200);
+    };
+</script>
+
+<!-- Service Worker Registration -->
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then((reg) => console.log('Service Worker registered:', reg.scope))
+                .catch((err) => console.log('Service Worker registration failed:', err));
+        });
+    }
+</script>
+
+</body>
+</html>
