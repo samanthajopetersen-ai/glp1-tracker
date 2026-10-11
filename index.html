@@ -909,38 +909,51 @@
         Tim: JSON.parse(JSON.stringify(emptyProfileData.Tim))
     };
 
+    // Load local storage immediately on startup so no logs disappear on app close
+    function loadFromLocalStorage(user) {
+        const stored = localStorage.getItem(`glp1_clean_v1_${user}`);
+        if (stored) {
+            try { 
+                userCache[user] = Object.assign({}, emptyProfileData[user], JSON.parse(stored)); 
+            } catch (e) { 
+                console.error("Local storage parse error:", e); 
+            }
+        }
+    }
+
     function listenToUserFirestore(user) {
         if (unsubscribeUserSync) unsubscribeUserSync();
 
+        // 1. Load local storage first for instant display
+        loadFromLocalStorage(user);
+        refreshUI();
+
+        // 2. Connect live listener to Firestore
         if (window.db && window.doc && window.onSnapshot) {
             const userDocRef = window.doc(window.db, "glp1_users", user);
             unsubscribeUserSync = window.onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    userCache[user] = docSnap.data();
+                    const cloudData = docSnap.data();
+                    userCache[user] = cloudData;
+                    // Keep local backup updated
+                    localStorage.setItem(`glp1_clean_v1_${user}`, JSON.stringify(cloudData));
                 } else {
-                    saveUserData(user, emptyProfileData[user]);
+                    saveUserData(user, userCache[user] || emptyProfileData[user]);
                 }
                 refreshUI();
             }, (error) => {
-                console.error("Firestore Listen Error:", error);
-                loadFromLocalStorage(user);
-                refreshUI();
+                console.error("Firestore Sync Error:", error);
+                const ind = document.getElementById('storage-indicator');
+                if (ind) {
+                    ind.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Local Only`;
+                }
             });
-        } else {
-            loadFromLocalStorage(user);
-            refreshUI();
-        }
-    }
-
-    function loadFromLocalStorage(user) {
-        const stored = localStorage.getItem(`glp1_clean_v1_${user}`);
-        if (stored) {
-            try { userCache[user] = JSON.parse(stored); } catch (e) { console.error(e); }
         }
     }
 
     async function saveUserData(user, data) {
         userCache[user] = data;
+        // Always save locally immediately so app closure won't lose inputs
         localStorage.setItem(`glp1_clean_v1_${user}`, JSON.stringify(data));
 
         if (window.db && window.doc && window.setDoc) {
@@ -948,7 +961,7 @@
                 const userDocRef = window.doc(window.db, "glp1_users", user);
                 await window.setDoc(userDocRef, data);
             } catch (err) {
-                console.error("Firestore Save Error:", err);
+                console.error("Firestore Save Error (Check Firebase Rules):", err);
             }
         }
 

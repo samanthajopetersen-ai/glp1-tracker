@@ -1,4 +1,4 @@
-const CACHE_NAME = 'glp1-tracker-v1';
+const CACHE_NAME = 'glp1-tracker-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
